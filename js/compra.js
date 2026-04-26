@@ -164,12 +164,22 @@ async function cargarAsientos(sectorId) {
 function seleccionarAsiento(asiento, el) {
   // Desmarcar anterior
   document.querySelectorAll(".asiento.seleccionado").forEach((a) => {
-    a.classList.remove("seleccionado", "bg-indigo-500", "border-indigo-500", "text-white");
+    a.classList.remove(
+      "seleccionado",
+      "bg-indigo-500",
+      "border-indigo-500",
+      "text-white",
+    );
     a.classList.add("bg-green-50", "border-green-400", "text-green-700");
   });
 
   // Marcar nuevo
-  el.classList.add("seleccionado", "bg-indigo-500", "border-indigo-500", "text-white");
+  el.classList.add(
+    "seleccionado",
+    "bg-indigo-500",
+    "border-indigo-500",
+    "text-white",
+  );
   el.classList.remove("bg-green-50", "border-green-400", "text-green-700");
 
   asientoSeleccionado = asiento;
@@ -184,7 +194,12 @@ function seleccionarAsiento(asiento, el) {
 window.cancelarSeleccion = function () {
   asientoSeleccionado = null;
   document.querySelectorAll(".asiento.seleccionado").forEach((a) => {
-    a.classList.remove("seleccionado", "bg-indigo-500", "border-indigo-500", "text-white");
+    a.classList.remove(
+      "seleccionado",
+      "bg-indigo-500",
+      "border-indigo-500",
+      "text-white",
+    );
     a.classList.add("bg-green-50", "border-green-400", "text-green-700");
   });
   document.getElementById("panel-reserva").classList.add("hidden");
@@ -214,13 +229,13 @@ window.reservarAsiento = async function () {
       userId,
     });
 
-    mostrarToast("✅ Reserva exitosa. ¡El asiento es tuyo!", "success");
+    mostrarToast("✅ Reserva exitosa.", "success");
     cancelarSeleccion();
 
     // Recargar asientos para mostrar el nuevo estado
     await cargarAsientos(sectorSeleccionado.id);
   } catch (err) {
-    mostrarToast("❌ No se pudo reservar. El asiento puede estar ocupado.", "error");
+    mostrarToast("❌ No se pudo realizar la reserva.", "error");
     // Refrescar mapa ante error de concurrencia
     await cargarAsientos(sectorSeleccionado.id);
     cancelarSeleccion();
@@ -236,9 +251,11 @@ function mostrarToast(mensaje, tipo = "success") {
   const container = document.getElementById("toast-container");
   const toast = document.createElement("div");
   toast.className = `px-5 py-3 rounded-xl text-sm font-medium shadow-md border animate-fade-in
-    ${tipo === "success"
-      ? "bg-green-50 border-green-300 text-green-800"
-      : "bg-red-50 border-red-300 text-red-800"}`;
+    ${
+      tipo === "success"
+        ? "bg-green-50 border-green-300 text-green-800"
+        : "bg-red-50 border-red-300 text-red-800"
+    }`;
   toast.textContent = mensaje;
   container.appendChild(toast);
   setTimeout(() => toast.remove(), 4000);
