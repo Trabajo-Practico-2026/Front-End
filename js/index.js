@@ -49,7 +49,7 @@ function renderizarTarjetas(lista) {
 
                 <button onclick="seleccionarEvento(${evento.id})" 
                         class="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-colors">
-                    Realizar Reservacion
+                    Seleccionar Asientos
                 </button>
             </div>
         </div>
@@ -59,9 +59,10 @@ function renderizarTarjetas(lista) {
 }
 
 // Función para manejar el clic (puedes llevarlo a otra página de compra)
+// Redirige a la página de compra con el id del evento
 window.seleccionarEvento = (id) => {
-  console.log("Evento seleccionado:", id);
-  // window.location.href = `compra.html?id=${id}`;
+  window.location.href = `compra.html?eventId=${id}`;
 };
-
+ 
 document.addEventListener("DOMContentLoaded", cargarEventos);
+ 
