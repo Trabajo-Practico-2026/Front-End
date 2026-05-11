@@ -5,6 +5,10 @@ let eventoId = null;
 let sectorSeleccionado = null;
 let asientoSeleccionado = null;
 
+// --- Temporizador ---
+let intervaloTemporizador = null;
+let segundosRestantes = 0;
+
 // --- Obtener eventId de la URL ---
 const params = new URLSearchParams(window.location.search);
 eventoId = params.get("eventId");
@@ -22,15 +26,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 // --- Cargar info del evento ---
 async function cargarEvento() {
   try {
-    // Cargamos todos los eventos y filtramos por id
     const eventos = await API.request("events");
     const evento = eventos.find((e) => String(e.id) === String(eventoId));
-
     if (!evento) {
       mostrarError("Evento no encontrado.");
       return;
     }
-
     const fecha = new Date(evento.eventDate).toLocaleDateString("es-AR", {
       day: "2-digit",
       month: "long",
@@ -38,11 +39,7 @@ async function cargarEvento() {
       hour: "2-digit",
       minute: "2-digit",
     });
-
-    // Breadcrumb
     document.getElementById("breadcrumb-evento").textContent = evento.name;
-
-    // Info card
     document.getElementById("evento-info").innerHTML = `
       <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-wrap justify-between items-center gap-4">
         <div>
@@ -68,12 +65,10 @@ async function cargarSectores() {
   const container = document.getElementById("sectores-container");
   try {
     const sectores = await API.request(`events/${eventoId}/sectors`);
-
     if (!sectores.length) {
       container.innerHTML = `<p class="text-slate-500">No hay sectores disponibles.</p>`;
       return;
     }
-
     container.innerHTML = "";
     sectores.forEach((sector) => {
       const btn = document.createElement("button");
@@ -94,16 +89,12 @@ async function cargarSectores() {
 
 // --- Seleccionar sector ---
 async function seleccionarSector(sector, btn) {
-  // Resetear selección anterior
   document.querySelectorAll(".sector-btn").forEach((b) => {
     b.classList.remove("border-indigo-500", "bg-indigo-50", "text-indigo-700");
     b.classList.add("border-slate-200");
   });
-
-  // Marcar activo
   btn.classList.remove("border-slate-200");
   btn.classList.add("border-indigo-500", "bg-indigo-50");
-
   sectorSeleccionado = sector;
   cancelarSeleccion();
   await cargarAsientos(sector.id);
@@ -113,26 +104,19 @@ async function seleccionarSector(sector, btn) {
 async function cargarAsientos(sectorId) {
   const section = document.getElementById("asientos-section");
   const container = document.getElementById("asientos-container");
-
   section.classList.remove("hidden");
   container.innerHTML = `<div class="col-span-full text-center py-8 text-slate-400">Cargando asientos...</div>`;
-
   try {
     const asientos = await API.request(`sector/${sectorId}/seats`);
-
     if (!asientos.length) {
       container.innerHTML = `<p class="text-slate-500 col-span-full">No hay asientos en este sector.</p>`;
       return;
     }
-
-    // Ordenar por número
     asientos.sort((a, b) => a.seatNumber - b.seatNumber);
-
     container.innerHTML = "";
     asientos.forEach((asiento) => {
       const disponible = asiento.status === "Available";
       const el = document.createElement("div");
-
       el.className = `
         asiento flex flex-col items-center justify-center rounded-lg border text-xs font-medium
         aspect-square cursor-pointer transition select-none
@@ -147,12 +131,9 @@ async function cargarAsientos(sectorId) {
         <span class="text-[10px] opacity-60">${asiento.rowIdentifier || ""}</span>
         <span>${asiento.seatNumber}</span>
       `;
-
-      // Solo los disponibles son clicables
       if (disponible) {
         el.onclick = () => seleccionarAsiento(asiento, el);
       }
-
       container.appendChild(el);
     });
   } catch {
@@ -162,29 +143,13 @@ async function cargarAsientos(sectorId) {
 
 // --- Seleccionar asiento ---
 function seleccionarAsiento(asiento, el) {
-  // Desmarcar anterior
   document.querySelectorAll(".asiento.seleccionado").forEach((a) => {
-    a.classList.remove(
-      "seleccionado",
-      "bg-indigo-500",
-      "border-indigo-500",
-      "text-white",
-    );
+    a.classList.remove("seleccionado", "bg-indigo-500", "border-indigo-500", "text-white");
     a.classList.add("bg-green-50", "border-green-400", "text-green-700");
   });
-
-  // Marcar nuevo
-  el.classList.add(
-    "seleccionado",
-    "bg-indigo-500",
-    "border-indigo-500",
-    "text-white",
-  );
+  el.classList.add("seleccionado", "bg-indigo-500", "border-indigo-500", "text-white");
   el.classList.remove("bg-green-50", "border-green-400", "text-green-700");
-
   asientoSeleccionado = asiento;
-
-  // Mostrar panel
   document.getElementById("info-asiento").textContent =
     `Fila ${asiento.rowIdentifier} · Asiento ${asiento.seatNumber} — ${sectorSeleccionado?.name || ""}`;
   document.getElementById("panel-reserva").classList.remove("hidden");
@@ -193,13 +158,9 @@ function seleccionarAsiento(asiento, el) {
 // --- Cancelar selección ---
 window.cancelarSeleccion = function () {
   asientoSeleccionado = null;
+  detenerTemporizador();
   document.querySelectorAll(".asiento.seleccionado").forEach((a) => {
-    a.classList.remove(
-      "seleccionado",
-      "bg-indigo-500",
-      "border-indigo-500",
-      "text-white",
-    );
+    a.classList.remove("seleccionado", "bg-indigo-500", "border-indigo-500", "text-white");
     a.classList.add("bg-green-50", "border-green-400", "text-green-700");
   });
   document.getElementById("panel-reserva").classList.add("hidden");
@@ -215,7 +176,6 @@ window.reservarAsiento = async function () {
     return;
   }
 
-  // Mostrar spinner
   const btn = document.getElementById("btn-reservar");
   const texto = document.getElementById("btn-texto");
   const spinner = document.getElementById("btn-spinner");
@@ -224,19 +184,22 @@ window.reservarAsiento = async function () {
   spinner.classList.remove("hidden");
 
   try {
-    const res = await API.request("reservations", "POST", {
+    await API.request("reservations", "POST", {
       seatId: asientoSeleccionado.id,
       userId,
     });
 
-    mostrarToast("✅ Reserva exitosa.", "success");
-    cancelarSeleccion();
+    mostrarToast("✅ Reserva exitosa. Tenés 5 minutos para pagar.", "success");
+
+    // Iniciar temporizador de 5 minutos
+    iniciarTemporizador(5 * 60);
 
     // Recargar asientos para mostrar el nuevo estado
     await cargarAsientos(sectorSeleccionado.id);
+
   } catch (err) {
-    mostrarToast("❌ No se pudo realizar la reserva.", "error");
-    // Refrescar mapa ante error de concurrencia
+    // Error de concurrencia: advertir y refrescar mapa
+    mostrarToast("❌ El asiento ya fue tomado por otro usuario. El mapa fue actualizado.", "error");
     await cargarAsientos(sectorSeleccionado.id);
     cancelarSeleccion();
   } finally {
@@ -246,6 +209,55 @@ window.reservarAsiento = async function () {
   }
 };
 
+// --- Temporizador ---
+function iniciarTemporizador(segundos) {
+  detenerTemporizador(); // limpiar cualquier temporizador anterior
+  segundosRestantes = segundos;
+
+  // Mostrar el panel del temporizador
+  document.getElementById("panel-temporizador").classList.remove("hidden");
+  actualizarDisplayTemporizador();
+
+  intervaloTemporizador = setInterval(() => {
+    segundosRestantes--;
+    actualizarDisplayTemporizador();
+
+    if (segundosRestantes <= 0) {
+      detenerTemporizador();
+      // Avisar al usuario que expiró y refrescar el mapa
+      mostrarToast("⏰ El tiempo expiró. Tu reserva fue liberada.", "error");
+      document.getElementById("panel-temporizador").classList.add("hidden");
+      cancelarSeleccion();
+      if (sectorSeleccionado) cargarAsientos(sectorSeleccionado.id);
+    }
+  }, 1000);
+}
+
+function detenerTemporizador() {
+  if (intervaloTemporizador) {
+    clearInterval(intervaloTemporizador);
+    intervaloTemporizador = null;
+  }
+  document.getElementById("panel-temporizador")?.classList.add("hidden");
+}
+
+function actualizarDisplayTemporizador() {
+  const minutos = Math.floor(segundosRestantes / 60).toString().padStart(2, "0");
+  const segs = (segundosRestantes % 60).toString().padStart(2, "0");
+  const display = document.getElementById("temporizador-display");
+  if (display) {
+    display.textContent = `${minutos}:${segs}`;
+    // Cambia a rojo cuando quedan menos de 60 segundos
+    if (segundosRestantes <= 60) {
+      display.classList.add("text-red-600");
+      display.classList.remove("text-indigo-600");
+    } else {
+      display.classList.add("text-indigo-600");
+      display.classList.remove("text-red-600");
+    }
+  }
+}
+
 // --- Mostrar toast ---
 function mostrarToast(mensaje, tipo = "success") {
   const container = document.getElementById("toast-container");
@@ -253,15 +265,14 @@ function mostrarToast(mensaje, tipo = "success") {
   toast.className = `px-5 py-3 rounded-xl text-sm font-medium shadow-md border animate-fade-in
     ${
       tipo === "success"
-        ? "bg-green-50 border-green-300 text-green-800"
-        : "bg-red-50 border-red-300 text-red-800"
+        ? "bg-green-50 border-green-200 text-green-800"
+        : "bg-red-50 border-red-200 text-red-800"
     }`;
   toast.textContent = mensaje;
   container.appendChild(toast);
   setTimeout(() => toast.remove(), 4000);
 }
 
-// --- Mostrar error general ---
 function mostrarError(msg) {
   document.getElementById("evento-info").innerHTML = `
     <div class="bg-red-50 border border-red-200 rounded-2xl p-6 text-red-700">${msg}</div>
