@@ -1,120 +1,149 @@
 <!DOCTYPE html>
-<html lang="es ">
+<html lang="es">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TicketUNAJ - Seleccion de Asientos </title>
-    <script src="https://cdn.tailwindcss.com   "></script>
-</head >
+    <title>TicketUNAJ - Seleccion de Asientos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
 <body class="bg-slate-50">
 
-    <!-- Header -->
-    <header class="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-salate-200">
-        <div class="container mx-auto px-6 py-4 flex justify-between items-center">     
-            <h1 class="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">TicketUNAJ
-            </h1>
-             <nav class="hidden md:flex space-x-8 font-medium text-slate-600 items-center">
+  <!-- MODAL LOGIN SIMULADO -->
+  <div id="modal-login" class="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center">
+    <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm mx-4">
+      <h2 class="text-2xl font-bold text-slate-800 mb-1">Bienvenido a TicketUNAJ</h2>
+      <p class="text-slate-500 text-sm mb-6">Ingresá tus datos para continuar</p>
+      <div class="mb-4">
+        <label class="text-xs text-slate-500 block mb-1 uppercase tracking-wide">Tu nombre</label>
+        <input type="text" id="login-nombre" placeholder="Ej: María García"
+          class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      </div>
+      <div class="mb-6">
+        <label class="text-xs text-slate-500 block mb-1 uppercase tracking-wide">User ID</label>
+        <input type="number" id="login-userid" value="1" min="1"
+          class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <p class="text-xs text-slate-400 mt-1">Usá el ID de tu usuario en el sistema</p>
+      </div>
+      <button id="btn-login"
+        class="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition">
+        Ingresar
+      </button>
+    </div>
+  </div>
+
+  <!-- WIDGET FLOTANTE TEMPORIZADOR -->
+  <div id="widget-timer" class="hidden fixed bottom-6 right-6 z-[150] bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 w-64">
+    <div class="flex items-center justify-between mb-2">
+      <p class="text-xs font-bold text-slate-500 uppercase tracking-wide">Tu reserva</p>
+      <span id="widget-badge" class="text-xs bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-full">Pendiente</span>
+    </div>
+    <p id="widget-asiento" class="text-sm font-bold text-slate-800 mb-3">—</p>
+    <p class="text-xs text-slate-400 uppercase tracking-wide mb-1">Tiempo restante</p>
+    <p id="widget-countdown" class="text-4xl font-bold font-mono text-indigo-600 mb-4">05:00</p>
+    <button onclick="confirmarPago()"
+      class="w-full py-2 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition text-sm flex items-center justify-center gap-2">
+      <span id="pago-texto">💳 Confirmar Pago</span>
+      <svg id="pago-spinner" class="hidden animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+      </svg>
+    </button>
+    <button onclick="cancelarReservaActiva()"
+      class="w-full mt-2 py-2 border border-slate-200 text-slate-500 rounded-xl text-xs hover:bg-slate-50 transition">
+      Cancelar reserva
+    </button>
+  </div>
+
+  <!-- Header -->
+  <header class="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-slate-200">
+    <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+      <h1 class="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">TicketUNAJ</h1>
+      <div class="flex items-center gap-4">
+        <span id="header-usuario" class="text-sm text-slate-500 hidden"></span>
+        <nav class="hidden md:flex space-x-8 font-medium text-slate-600 items-center">
           <a href="index.html" class="hover:text-indigo-600 transition">Eventos</a>
           <a href="gestion.html" class="hover:text-indigo-600 transition text-sm bg-slate-100 px-3 py-1 rounded">Admin</a>
         </nav>
       </div>
-    </header>
- 
-    <!-- BREADCRUMB -->
-    <div class="container mx-auto px-6 py-4">
-      <nav class="text-sm text-slate-500">
-        <a href="index.html" class="hover:text-indigo-600 transition">Eventos</a>
-        <span class="mx-2">/</span>
-        <span id="breadcrumb-evento" class="text-slate-800 font-medium">Cargando...</span>
-      </span>
-      </nav>
     </div>
- 
-    <main class="container mx-auto px-6 pb-32">
- 
-      <!-- INFO DEL EVENTO -->
-      <div id="evento-info" class="mb-8">
-        <div class="animate-pulse bg-white rounded-2xl h-24 shadow-sm border border-slate-200"></div>
-      </div>
- 
-      <!-- SECTORES -->
-      <div class="mb-8">
-        <h3 class="text-lg font-bold text-slate-800 mb-4">Seleccioná un sector</h3>
-        <div id="sectores-container" class="flex flex-wrap gap-3">
-          <div class="animate-pulse bg-white rounded-xl h-16 w-36 shadow-sm border border-slate-200"></div>
-          <div class="animate-pulse bg-white rounded-xl h-16 w-36 shadow-sm border border-slate-200"></div>
-        </div>
-      </div>
- 
-      <!-- MAPA DE ASIENTOS -->
-      <div id="asientos-section" class="hidden">
-        <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
-          <h3 class="text-lg font-bold text-slate-800">Mapa de Asientos</h3>
-          <!-- LEYENDA -->
-          <div class="flex gap-4 text-sm text-slate-500">
-            <span class="flex items-center gap-2">
-              <span class="w-4 h-4 rounded bg-green-100 border border-green-400 inline-block"></span> Disponible
-            </span>
-            <span class="flex items-center gap-2">
-              <span class="w-4 h-4 rounded bg-red-100 border border-red-300 inline-block"></span> Ocupado
-            </span>
-            <span class="flex items-center gap-2">
-              <span class="w-4 h-4 rounded bg-indigo-500 inline-block"></span> Seleccionado
-            </span>
-          </div>
-        </div>
- 
-        <!-- ESCENARIO -->
-        <div class="text-center mb-6">
-          <div class="inline-block bg-slate-800 text-white text-xs font-bold px-16 py-2 rounded-t-xl tracking-widest">
-            ESCENARIO
-          </div>
-        </div>
- 
-        <div id="asientos-container" class="grid gap-2" style="grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));">
-          <div class="animate-pulse bg-white rounded h-12 shadow-sm border border-slate-200"></div>
-        </div>
-      </div>
- 
-    </main>
- 
-    <!-- PANEL DE RESERVA (fijo abajo) -->
-    <div id="panel-reserva" class="hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg z-50">
-      <div class="container mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-4">
-        <!-- TEMPORIZADOR -->
-        <div id="panel-temporizador" class="hidden w-full text-center mb-2">
-           <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Tiempo para completar el pago</p>
-           <p id="temporizador-display" class="text-3xl font-bold font-mono text-indigo-600">05:00</p>
-        </div>
-        <div>
-          <p class="text-xs text-slate-500 uppercase tracking-wide">Asiento seleccionado</p>
-          <p id="info-asiento" class="text-lg font-bold text-slate-800">—</p>
-        </div>
-        <div class="flex items-end gap-3">
-          <div>
-            <label class="text-xs text-slate-500 block mb-1">Tu User ID</label>
-            <input type="number" id="user-id" value="1" min="1"
-              class="w-24 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          </div>
-          <button id="btn-cancelar" onclick="cancelarSeleccion()"
-            class="px-4 py-2 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-100 transition text-sm font-medium">
-            Cancelar
-          </button>
-          <button id="btn-reservar" onclick="reservarAsiento()"
-            class="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition flex items-center gap-2">
-            <span id="btn-texto">Confirmar Reserva</span>
-            <svg id="btn-spinner" class="hidden animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-            </svg>
-          </button>
-        </div>
+  </header>
+
+  <!-- BREADCRUMB -->
+  <div class="container mx-auto px-6 py-4">
+    <nav class="text-sm text-slate-500">
+      <a href="index.html" class="hover:text-indigo-600 transition">Eventos</a>
+      <span class="mx-2">/</span>
+      <span id="breadcrumb-evento" class="text-slate-800 font-medium">Cargando...</span>
+    </nav>
+  </div>
+
+  <main class="container mx-auto px-6 pb-32">
+
+    <!-- INFO DEL EVENTO -->
+    <div id="evento-info" class="mb-8">
+      <div class="animate-pulse bg-white rounded-2xl h-24 shadow-sm border border-slate-200"></div>
+    </div>
+
+    <!-- SECTORES -->
+    <div class="mb-8">
+      <h3 class="text-lg font-bold text-slate-800 mb-4">Seleccioná un sector</h3>
+      <div id="sectores-container" class="flex flex-wrap gap-3">
+        <div class="animate-pulse bg-white rounded-xl h-16 w-36 shadow-sm border border-slate-200"></div>
+        <div class="animate-pulse bg-white rounded-xl h-16 w-36 shadow-sm border border-slate-200"></div>
       </div>
     </div>
- 
-    <!-- TOAST -->
-    <div id="toast-container" class="fixed top-6 right-6 flex flex-col gap-3 z-[100]"></div>
- 
-    <script type="module" src="js/compra.js"></script>
-  </body>
+
+    <!-- MAPA DE ASIENTOS -->
+    <div id="asientos-section" class="hidden">
+      <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+        <h3 class="text-lg font-bold text-slate-800">Mapa de Asientos</h3>
+        <div class="flex gap-4 text-sm text-slate-500">
+          <span class="flex items-center gap-2">
+            <span class="w-4 h-4 rounded bg-green-100 border border-green-400 inline-block"></span> Disponible
+          </span>
+          <span class="flex items-center gap-2">
+            <span class="w-4 h-4 rounded bg-red-100 border border-red-300 inline-block"></span> Ocupado
+          </span>
+          <span class="flex items-center gap-2">
+            <span class="w-4 h-4 rounded bg-indigo-500 inline-block"></span> Seleccionado
+          </span>
+        </div>
+      </div>
+      <div class="text-center mb-6">
+        <div class="inline-block bg-slate-800 text-white text-xs font-bold px-16 py-2 rounded-t-xl tracking-widest">ESCENARIO</div>
+      </div>
+      <div id="asientos-container" class="grid gap-2" style="grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));"></div>
+    </div>
+
+  </main>
+
+  <!-- PANEL DE RESERVA (fijo abajo) -->
+  <div id="panel-reserva" class="hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg z-50">
+    <div class="container mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <p class="text-xs text-slate-500 uppercase tracking-wide">Asiento seleccionado</p>
+        <p id="info-asiento" class="text-lg font-bold text-slate-800">—</p>
+      </div>
+      <div class="flex items-end gap-3">
+        <button id="btn-cancelar" onclick="cancelarSeleccion()"
+          class="px-4 py-2 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-100 transition text-sm font-medium">
+          Cancelar
+        </button>
+        <button id="btn-reservar" onclick="reservarAsiento()"
+          class="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition flex items-center gap-2">
+          <span id="btn-texto">Confirmar Reserva</span>
+          <svg id="btn-spinner" class="hidden animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toast-container" class="fixed top-6 right-6 flex flex-col gap-3 z-[100]"></div>
+
+  <script type="module" src="js/compra.js"></script>
+</body>
 </html>
