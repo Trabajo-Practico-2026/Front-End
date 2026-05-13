@@ -4,53 +4,8 @@ const container = document.getElementById("eventos-container");
 
 // --- LOGIN SIMULADO ---
 document.addEventListener("DOMContentLoaded", () => {
-  // Verificar si ya hay sesión activa
-  const sesion = obtenerSesion();
-  if (sesion) {
-    ocultarModalLogin();
-    mostrarUsuarioEnHeader(sesion.nombre);
-  }
-
-  // Conectar botón de login
-  document.getElementById("btn-login").addEventListener("click", confirmarLogin);
-
   cargarEventos();
 });
-
-function confirmarLogin() {
-  const nombre = document.getElementById("login-nombre").value.trim();
-  const userId = parseInt(document.getElementById("login-userid").value);
-
-  if (!nombre) {
-    alert("Ingresá tu nombre.");
-    return;
-  }
-  if (!userId || userId < 1) {
-    alert("Ingresá un User ID válido.");
-    return;
-  }
-
-  sessionStorage.setItem("sesion", JSON.stringify({ nombre, userId }));
-  ocultarModalLogin();
-  mostrarUsuarioEnHeader(nombre);
-}
-
-function ocultarModalLogin() {
-  document.getElementById("modal-login").classList.add("hidden");
-}
-
-function obtenerSesion() {
-  const raw = sessionStorage.getItem("sesion");
-  return raw ? JSON.parse(raw) : null;
-}
-
-function mostrarUsuarioEnHeader(nombre) {
-  const el = document.getElementById("header-usuario");
-  if (el) {
-    el.textContent = `👤 ${nombre}`;
-    el.classList.remove("hidden");
-  }
-}
 
 // --- Cargar eventos ---
 async function cargarEventos() {
@@ -111,4 +66,3 @@ function renderizarTarjetas(lista) {
 window.seleccionarEvento = (id) => {
   window.location.href = `compra.html?eventId=${id}`;
 };
- 

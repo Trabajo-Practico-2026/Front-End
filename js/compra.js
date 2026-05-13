@@ -17,59 +17,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-  // Conectar botón de login
-  document
-    .getElementById("btn-login")
-    .addEventListener("click", confirmarLogin);
-
-  // Verificar si ya hay sesión activa
-  const sesion = obtenerSesion();
-  if (sesion) {
-    ocultarModalLogin();
-    mostrarUsuarioEnHeader(sesion.nombre);
-  }
-
+  if (window.Auth) window.Auth.actualizarUI();
   // Restaurar reserva activa si existe en sessionStorage
   restaurarReservaActiva();
 
   await cargarEvento();
   await cargarSectores();
+  const sectorId = localStorage.getItem("SectorId");
+  if (sectorId) cargarAsientos(sectorId);
 });
-
-// --- LOGIN SIMULADO ---
-function confirmarLogin() {
-  const nombre = document.getElementById("login-nombre").value.trim();
-  const userId = parseInt(document.getElementById("login-userid").value);
-
-  if (!nombre) {
-    alert("Ingresá tu nombre.");
-    return;
-  }
-  if (!userId || userId < 1) {
-    alert("Ingresá un User ID válido.");
-    return;
-  }
-
-  // Guardar sesión en sessionStorage
-  sessionStorage.setItem("sesion", JSON.stringify({ nombre, userId }));
-  ocultarModalLogin();
-  mostrarUsuarioEnHeader(nombre);
-}
-
-function ocultarModalLogin() {
-  document.getElementById("modal-login").classList.add("hidden");
-}
-
-function obtenerSesion() {
-  const raw = sessionStorage.getItem("sesion");
-  return raw ? JSON.parse(raw) : null;
-}
-
-function mostrarUsuarioEnHeader(nombre) {
-  const el = document.getElementById("header-usuario");
-  el.textContent = `👤 ${nombre}`;
-  el.classList.remove("hidden");
-}
 
 // --- Cargar info del evento ---
 async function cargarEvento() {
@@ -111,6 +67,7 @@ async function cargarEvento() {
 // --- Cargar sectores ---
 async function cargarSectores() {
   const container = document.getElementById("sectores-container");
+  const sectorGuardadoId = localStorage.getItem("SectorId");
   try {
     const sectores = await API.request(`events/${eventoId}/sectors`);
     if (!sectores.length) {
@@ -120,8 +77,12 @@ async function cargarSectores() {
     container.innerHTML = "";
     sectores.forEach((sector) => {
       const btn = document.createElement("button");
-      btn.className =
-        "sector-btn bg-white border border-slate-200 rounded-xl px-5 py-3 text-left hover:border-indigo-400 hover:shadow transition";
+      const esSeleccionado = String(sector.id) === String(sectorGuardadoId);
+      btn.className = `sector-btn border rounded-xl px-5 py-3 text-left hover:border-indigo-400 hover:shadow transition ${
+        esSeleccionado
+          ? "border-indigo-500 bg-white"
+          : "border-slate-200 bg-white"
+      }`;
       btn.dataset.id = sector.id;
       btn.innerHTML = `
         <p class="font-bold text-slate-800">${sector.name}</p>
@@ -144,6 +105,8 @@ async function seleccionarSector(sector, btn) {
   btn.classList.remove("border-slate-200");
   btn.classList.add("border-indigo-500", "bg-indigo-50");
   sectorSeleccionado = sector;
+  localStorage.setItem("SectorId", sector.id);
+  localStorage.setItem("SectorName", sector.name);
   cancelarSeleccion();
   await cargarAsientos(sector.id);
 }
@@ -227,9 +190,10 @@ window.cancelarSeleccion = function () {
 window.reservarAsiento = async function () {
   if (!asientoSeleccionado) return;
 
-  const sesion = obtenerSesion();
+  const sesion = window.Auth.obtenerSesion();
   if (!sesion) {
-    mostrarToast("Iniciá sesión primero.", "error");
+    window.Auth.showToast("Iniciá sesión primero.", "error");
+    window.Auth.mostrarModal();
     return;
   }
 
@@ -248,7 +212,7 @@ window.reservarAsiento = async function () {
 
     const reservaActiva = {
       reservationId: res.reservationId || res.id || null,
-      seatInfo: `Fila ${asientoSeleccionado.rowIdentifier} · Asiento ${asientoSeleccionado.seatNumber} — ${sectorSeleccionado?.name || ""}`,
+      seatInfo: `Fila ${asientoSeleccionado.rowIdentifier} · Asiento ${asientoSeleccionado.seatNumber} — ${sectorSeleccionado?.name || localStorage.getItem("SectorName") || ""}`,
       expiraEn: Date.now() + 5 * 60 * 1000,
     };
     sessionStorage.setItem("reservaActiva", JSON.stringify(reservaActiva));
@@ -256,13 +220,13 @@ window.reservarAsiento = async function () {
     mostrarToast("✅ Reserva exitosa. Tenés 5 minutos para pagar.", "success");
     cancelarSeleccion();
     mostrarWidgetTimer(reservaActiva);
-    await cargarAsientos(sectorSeleccionado.id);
+    await cargarAsientos(localStorage.getItem("SectorId"));
   } catch {
     mostrarToast(
       "❌ El asiento ya fue tomado por otro usuario. El mapa fue actualizado.",
       "error",
     );
-    await cargarAsientos(sectorSeleccionado.id);
+    await cargarAsientos(localStorage.getItem("SectorId"));
     cancelarSeleccion();
   } finally {
     btn.disabled = false;
@@ -288,35 +252,58 @@ function mostrarWidgetTimer(reservaActiva) {
 }
 
 function iniciarCuentaRegresiva(expiraEn) {
+  // 1. Limpiar cualquier intervalo previo
   if (intervaloTemporizador) clearInterval(intervaloTemporizador);
 
-  intervaloTemporizador = setInterval(() => {
-    const restantes = Math.max(0, Math.floor((expiraEn - Date.now()) / 1000));
+  const display = document.getElementById("widget-countdown");
+  const widget = document.getElementById("widget-timer");
+
+  // 2. Definimos la lógica de actualización en una función interna
+  const actualizar = () => {
+    const ahora = Date.now();
+    const restantes = Math.max(0, Math.floor((expiraEn - ahora) / 1000));
+
     const min = Math.floor(restantes / 60)
       .toString()
       .padStart(2, "0");
     const seg = (restantes % 60).toString().padStart(2, "0");
-    const display = document.getElementById("widget-countdown");
 
     if (display) {
       display.textContent = `${min}:${seg}`;
+
+      // Colores según el tiempo restante
       if (restantes <= 60) {
-        display.classList.add("text-red-600");
-        display.classList.remove("text-indigo-600");
+        display.classList.replace("text-indigo-600", "text-red-600");
       } else {
         display.classList.add("text-indigo-600");
         display.classList.remove("text-red-600");
       }
     }
 
+    // Lógica cuando el tiempo llega a cero
     if (restantes <= 0) {
       clearInterval(intervaloTemporizador);
+
       sessionStorage.removeItem("reservaActiva");
-      document.getElementById("widget-timer").classList.add("hidden");
-      mostrarToast("⏰ El tiempo expiró. Tu reserva fue liberada.", "error");
-      if (sectorSeleccionado) cargarAsientos(sectorSeleccionado.id);
+
+      if (widget) widget.classList.add("hidden");
+      document.body.classList.remove("overflow-hidden");
+
+      window.Auth.showToast(
+        "⏰ El tiempo expiró. Tu reserva fue liberada.",
+        "error",
+      );
+
+      const sId = sectorSeleccionado?.id || LocalStorage.getItem("SectorId");
+      if (sId) cargarAsientos(sId);
     }
-  }, 1000);
+  };
+
+  // 3. EJECUCIÓN INMEDIATA: Actualizamos antes de que pase el primer segundo
+  actualizar();
+
+  // 4. Iniciamos el intervalo para los siguientes segundos
+  intervaloTemporizador = setInterval(actualizar, 1000);
 }
 
 // --- Restaurar reserva activa al refrescar ---
@@ -376,7 +363,8 @@ window.confirmarPago = async function () {
     sessionStorage.removeItem("reservaActiva");
     document.getElementById("widget-timer").classList.add("hidden");
     mostrarToast("🎉 ¡Pago confirmado! Tu entrada fue comprada.", "success");
-    if (sectorSeleccionado) await cargarAsientos(sectorSeleccionado.id);
+    if (sectorSeleccionado)
+      await cargarAsientos(localStorage.getItem("SectorId"));
   } catch {
     mostrarToast("❌ Error al confirmar el pago. Intentá de nuevo.", "error");
   } finally {
@@ -401,7 +389,7 @@ window.cancelarReservaActiva = async function () {
     sessionStorage.removeItem("reservaActiva");
     document.getElementById("widget-timer").classList.add("hidden");
     mostrarToast("Reserva cancelada y asiento liberado.", "success");
-    if (sectorSeleccionado) cargarAsientos(sectorSeleccionado.id);
+    await cargarAsientos(localStorage.getItem("SectorId"));
   } catch (error) {
     mostrarToast("Error al cancelar la reserva.", "error");
   }
@@ -422,4 +410,9 @@ function mostrarError(msg) {
   document.getElementById("evento-info").innerHTML = `
     <div class="bg-red-50 border border-red-200 rounded-2xl p-6 text-red-700">${msg}</div>
   `;
+}
+
+function obtenerSesion() {
+  const raw = sessionStorage.getItem("sesion");
+  return raw ? JSON.parse(raw) : null;
 }
