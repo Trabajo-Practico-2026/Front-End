@@ -1,5 +1,6 @@
 import { API } from "./api.js";
-
+// --- Delay ---
+const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 // --- Estado de la página ---
 let eventoId = null;
 let sectorSeleccionado = null;
@@ -168,10 +169,20 @@ async function cargarAsientos(sectorId) {
 // --- Seleccionar asiento ---
 function seleccionarAsiento(asiento, el) {
   document.querySelectorAll(".asiento.seleccionado").forEach((a) => {
-    a.classList.remove("seleccionado", "bg-indigo-500", "border-indigo-500", "text-white");
+    a.classList.remove(
+      "seleccionado",
+      "bg-indigo-500",
+      "border-indigo-500",
+      "text-white",
+    );
     a.classList.add("bg-green-50", "border-green-400", "text-green-700");
   });
-  el.classList.add("seleccionado", "bg-indigo-500", "border-indigo-500", "text-white");
+  el.classList.add(
+    "seleccionado",
+    "bg-indigo-500",
+    "border-indigo-500",
+    "text-white",
+  );
   el.classList.remove("bg-green-50", "border-green-400", "text-green-700");
   asientoSeleccionado = asiento;
   document.getElementById("info-asiento").textContent =
@@ -183,7 +194,12 @@ function seleccionarAsiento(asiento, el) {
 window.cancelarSeleccion = function () {
   asientoSeleccionado = null;
   document.querySelectorAll(".asiento.seleccionado").forEach((a) => {
-    a.classList.remove("seleccionado", "bg-indigo-500", "border-indigo-500", "text-white");
+    a.classList.remove(
+      "seleccionado",
+      "bg-indigo-500",
+      "border-indigo-500",
+      "text-white",
+    );
     a.classList.add("bg-green-50", "border-green-400", "text-green-700");
   });
   document.getElementById("panel-reserva").classList.add("hidden");
@@ -205,6 +221,7 @@ window.reservarAsiento = async function () {
   const spinner = document.getElementById("btn-spinner");
   btn.disabled = true;
   texto.textContent = "Reservando...";
+  await delay(1000);
   spinner.classList.remove("hidden");
 
   try {
@@ -224,28 +241,26 @@ window.reservarAsiento = async function () {
     cancelarSeleccion();
     mostrarWidgetTimer(reservaActiva);
     await cargarAsientos(localStorage.getItem("SectorId"));
-
   } catch (error) {
     // UX: Manejo diferenciado de errores según el código HTTP del backend
     if (error?.status === 409 || error?.message?.includes("409")) {
       // Error de concurrencia: otro usuario tomó el asiento al mismo tiempo
       mostrarToast(
         "⚠️ ¡Conflicto! Otro usuario reservó este asiento al mismo tiempo. El mapa fue actualizado, elegí otro.",
-        "error"
+        "error",
       );
     } else if (error?.status === 404) {
       mostrarToast("❌ El asiento no existe. Recargá la página.", "error");
     } else {
       mostrarToast(
         "❌ El asiento ya no está disponible. El mapa fue actualizado.",
-        "error"
+        "error",
       );
     }
 
     // UX: Siempre refrescar el mapa tras un error para mostrar el estado real
     await cargarAsientos(localStorage.getItem("SectorId"));
     cancelarSeleccion();
-
   } finally {
     btn.disabled = false;
     texto.textContent = "Confirmar Reserva";
@@ -256,7 +271,8 @@ window.reservarAsiento = async function () {
 // --- Widget flotante del temporizador ---
 function mostrarWidgetTimer(reservaActiva) {
   const widget = document.getElementById("widget-timer");
-  document.getElementById("widget-asiento").textContent = reservaActiva.seatInfo;
+  document.getElementById("widget-asiento").textContent =
+    reservaActiva.seatInfo;
 
   widget.classList.remove("hidden");
   widget.classList.add("flex");
@@ -277,7 +293,9 @@ function iniciarCuentaRegresiva(expiraEn) {
     const ahora = Date.now();
     const restantes = Math.max(0, Math.floor((expiraEn - ahora) / 1000));
 
-    const min = Math.floor(restantes / 60).toString().padStart(2, "0");
+    const min = Math.floor(restantes / 60)
+      .toString()
+      .padStart(2, "0");
     const seg = (restantes % 60).toString().padStart(2, "0");
 
     if (display) {
@@ -299,7 +317,10 @@ function iniciarCuentaRegresiva(expiraEn) {
       if (widget) widget.classList.add("hidden");
       document.body.classList.remove("overflow-hidden");
 
-      window.Auth.showToast("⏰ El tiempo expiró. Tu reserva fue liberada.", "error");
+      window.Auth.showToast(
+        "⏰ El tiempo expiró. Tu reserva fue liberada.",
+        "error",
+      );
 
       // Fix: corregido bug de capitalización (LocalStorage → localStorage)
       const sId = sectorSeleccionado?.id || localStorage.getItem("SectorId");
@@ -326,7 +347,8 @@ function restaurarReservaActiva() {
   }
 
   const widget = document.getElementById("widget-timer");
-  document.getElementById("widget-asiento").textContent = reservaActiva.seatInfo;
+  document.getElementById("widget-asiento").textContent =
+    reservaActiva.seatInfo;
 
   widget.classList.remove("hidden");
   widget.classList.add("flex");
@@ -350,16 +372,21 @@ window.confirmarPago = async function () {
   const btnTexto = document.getElementById("pago-texto");
   const spinner = document.getElementById("pago-spinner");
   btnTexto.textContent = "Procesando...";
+  await delay(2000);
   spinner.classList.remove("hidden");
 
   try {
-    await API.request(`reservations/${reservaActiva.reservationId}/confirm`, "PUT");
+    await API.request(
+      `reservations/${reservaActiva.reservationId}/confirm`,
+      "PUT",
+    );
     clearInterval(intervaloTemporizador);
     sessionStorage.removeItem("reservaActiva");
     document.getElementById("widget-timer").classList.add("hidden");
     document.body.classList.remove("overflow-hidden");
     mostrarToast("🎉 ¡Pago confirmado! Tu entrada fue comprada.", "success");
-    if (sectorSeleccionado) await cargarAsientos(localStorage.getItem("SectorId"));
+    if (sectorSeleccionado)
+      await cargarAsientos(localStorage.getItem("SectorId"));
   } catch {
     mostrarToast("❌ Error al confirmar el pago. Intentá de nuevo.", "error");
   } finally {
@@ -381,7 +408,7 @@ window.cancelarReservaActiva = async function () {
     sessionStorage.removeItem("reservaActiva");
     document.getElementById("widget-timer").classList.add("hidden");
     document.body.classList.remove("overflow-hidden");
-    mostrarToast("Reserva cancelada y asiento liberado.", "success");
+    mostrarToast("✅ Reserva cancelada y asiento liberado.", "success");
     await cargarAsientos(localStorage.getItem("SectorId"));
   } catch {
     mostrarToast("❌ Error al cancelar la reserva.", "error");
