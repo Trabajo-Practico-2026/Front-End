@@ -1,7 +1,7 @@
 // login.js
-import { API } from "./api.js"; // IMPORTANTE: Ahora que es módulo, podés importar
+import { API } from "./api.js";
 
-// 1. Inyección de HTML (se ejecuta apenas se importa el script)
+// 1. Inyección de HTML
 document.body.insertAdjacentHTML(
   "beforeend",
   `
@@ -19,7 +19,7 @@ document.body.insertAdjacentHTML(
 `,
 );
 
-// 2. Definimos Auth y lo asignamos a window para que index.js lo vea
+// 2. Definimos Auth y lo asignamos a window
 window.Auth = {
   key: "sesion",
 
@@ -35,11 +35,27 @@ window.Auth = {
     document.getElementById("modal-login").classList.add("hidden");
   },
 
+  // Cierra la sesión: borra el storage y recarga la página
+  cerrarSesion() {
+    sessionStorage.removeItem(this.key);
+    sessionStorage.removeItem("reservaActiva");
+    location.reload();
+  },
+
   actualizarUI() {
     const sesion = this.obtenerSesion();
     document.querySelectorAll("#header-usuario").forEach((el) => {
       if (sesion) {
-        el.textContent = `👤 ${sesion.nombre}`;
+        // Muestra el nombre + botón de cerrar sesión
+        el.innerHTML = `
+          <span class="text-sm text-slate-600">👤 ${sesion.nombre}</span>
+          <button
+            onclick="window.Auth.cerrarSesion()"
+            class="ml-2 text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-2 py-1 rounded-lg transition"
+          >
+            Cerrar sesión
+          </button>
+        `;
         el.classList.remove("hidden");
       }
     });
@@ -68,7 +84,6 @@ const iniciar = () => {
   }
   window.Auth.actualizarUI();
 
-  // Escuchar el clic del botón (dentro del módulo no usamos onclick en el HTML)
   document
     .getElementById("btn-confirmar-login")
     .addEventListener("click", async () => {

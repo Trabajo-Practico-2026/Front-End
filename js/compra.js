@@ -18,11 +18,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   if (window.Auth) window.Auth.actualizarUI();
+
   // Restaurar reserva activa si existe en sessionStorage
   restaurarReservaActiva();
 
   await cargarEvento();
   await cargarSectores();
+
   const sectorId = localStorage.getItem("SectorId");
   if (sectorId) cargarAsientos(sectorId);
 });
@@ -111,12 +113,23 @@ async function seleccionarSector(sector, btn) {
   await cargarAsientos(sector.id);
 }
 
-// --- Cargar asientos ---
+// --- Cargar asientos con spinner animado ---
 async function cargarAsientos(sectorId) {
   const section = document.getElementById("asientos-section");
   const container = document.getElementById("asientos-container");
   section.classList.remove("hidden");
-  container.innerHTML = `<div class="col-span-full text-center py-8 text-slate-400">Cargando asientos...</div>`;
+
+  // Spinner animado mientras carga (UX: retroalimentación visual de carga)
+  container.innerHTML = `
+    <div class="col-span-full flex flex-col items-center justify-center py-12 gap-3 text-slate-400">
+      <svg class="animate-spin h-8 w-8 text-indigo-500" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+      </svg>
+      <span class="text-sm">Cargando asientos...</span>
+    </div>
+  `;
+
   try {
     const asientos = await API.request(`sector/${sectorId}/seats`);
     if (!asientos.length) {
@@ -128,42 +141,37 @@ async function cargarAsientos(sectorId) {
     asientos.forEach((asiento) => {
       const disponible = asiento.status === "Available";
       const el = document.createElement("div");
-      el.className = `asiento flex flex-col items-center justify-center rounded-lg border text-xs font-medium aspect-square cursor-pointer transition select-none
+
+      // UX: asientos ocupados no responden a clicks (previene peticiones innecesarias al backend)
+      el.className = `asiento flex flex-col items-center justify-center rounded-lg border text-xs font-medium aspect-square transition select-none
         ${
           disponible
-            ? "bg-green-50 border-green-400 text-green-700 hover:bg-green-100 hover:scale-105"
-            : "bg-red-50 border-red-200 text-red-300 cursor-not-allowed"
+            ? "bg-green-50 border-green-400 text-green-700 hover:bg-green-100 hover:scale-105 cursor-pointer"
+            : "bg-red-50 border-red-200 text-red-300 cursor-not-allowed opacity-60"
         }`;
       el.dataset.id = asiento.id;
       el.innerHTML = `
         <span class="text-[10px] opacity-60">${asiento.rowIdentifier || ""}</span>
         <span>${asiento.seatNumber}</span>
       `;
+
+      // Solo asientos disponibles responden al click
       if (disponible) el.onclick = () => seleccionarAsiento(asiento, el);
+
       container.appendChild(el);
     });
   } catch {
-    container.innerHTML = `<p class="text-red-500 col-span-full">Error al cargar los asientos.</p>`;
+    container.innerHTML = `<p class="text-red-500 col-span-full">Error al cargar los asientos. Intentá recargar la página.</p>`;
   }
 }
 
 // --- Seleccionar asiento ---
 function seleccionarAsiento(asiento, el) {
   document.querySelectorAll(".asiento.seleccionado").forEach((a) => {
-    a.classList.remove(
-      "seleccionado",
-      "bg-indigo-500",
-      "border-indigo-500",
-      "text-white",
-    );
+    a.classList.remove("seleccionado", "bg-indigo-500", "border-indigo-500", "text-white");
     a.classList.add("bg-green-50", "border-green-400", "text-green-700");
   });
-  el.classList.add(
-    "seleccionado",
-    "bg-indigo-500",
-    "border-indigo-500",
-    "text-white",
-  );
+  el.classList.add("seleccionado", "bg-indigo-500", "border-indigo-500", "text-white");
   el.classList.remove("bg-green-50", "border-green-400", "text-green-700");
   asientoSeleccionado = asiento;
   document.getElementById("info-asiento").textContent =
@@ -175,18 +183,13 @@ function seleccionarAsiento(asiento, el) {
 window.cancelarSeleccion = function () {
   asientoSeleccionado = null;
   document.querySelectorAll(".asiento.seleccionado").forEach((a) => {
-    a.classList.remove(
-      "seleccionado",
-      "bg-indigo-500",
-      "border-indigo-500",
-      "text-white",
-    );
+    a.classList.remove("seleccionado", "bg-indigo-500", "border-indigo-500", "text-white");
     a.classList.add("bg-green-50", "border-green-400", "text-green-700");
   });
   document.getElementById("panel-reserva").classList.add("hidden");
 };
 
-// --- Reservar asiento ---
+// --- Reservar asiento con manejo de errores UX ---
 window.reservarAsiento = async function () {
   if (!asientoSeleccionado) return;
 
@@ -221,13 +224,28 @@ window.reservarAsiento = async function () {
     cancelarSeleccion();
     mostrarWidgetTimer(reservaActiva);
     await cargarAsientos(localStorage.getItem("SectorId"));
-  } catch {
-    mostrarToast(
-      "❌ El asiento ya fue tomado por otro usuario. El mapa fue actualizado.",
-      "error",
-    );
+
+  } catch (error) {
+    // UX: Manejo diferenciado de errores según el código HTTP del backend
+    if (error?.status === 409 || error?.message?.includes("409")) {
+      // Error de concurrencia: otro usuario tomó el asiento al mismo tiempo
+      mostrarToast(
+        "⚠️ ¡Conflicto! Otro usuario reservó este asiento al mismo tiempo. El mapa fue actualizado, elegí otro.",
+        "error"
+      );
+    } else if (error?.status === 404) {
+      mostrarToast("❌ El asiento no existe. Recargá la página.", "error");
+    } else {
+      mostrarToast(
+        "❌ El asiento ya no está disponible. El mapa fue actualizado.",
+        "error"
+      );
+    }
+
+    // UX: Siempre refrescar el mapa tras un error para mostrar el estado real
     await cargarAsientos(localStorage.getItem("SectorId"));
     cancelarSeleccion();
+
   } finally {
     btn.disabled = false;
     texto.textContent = "Confirmar Reserva";
@@ -238,40 +256,34 @@ window.reservarAsiento = async function () {
 // --- Widget flotante del temporizador ---
 function mostrarWidgetTimer(reservaActiva) {
   const widget = document.getElementById("widget-timer");
-  document.getElementById("widget-asiento").textContent =
-    reservaActiva.seatInfo;
+  document.getElementById("widget-asiento").textContent = reservaActiva.seatInfo;
 
-  // CAMBIO: Usamos flex para centrar y quitamos hidden
   widget.classList.remove("hidden");
   widget.classList.add("flex");
 
-  // BLOQUEO: Evita que el usuario scrollee el mapa de asientos mientras paga
+  // Bloquea el scroll del fondo mientras hay una reserva activa
   document.body.classList.add("overflow-hidden");
 
   iniciarCuentaRegresiva(reservaActiva.expiraEn);
 }
 
 function iniciarCuentaRegresiva(expiraEn) {
-  // 1. Limpiar cualquier intervalo previo
   if (intervaloTemporizador) clearInterval(intervaloTemporizador);
 
   const display = document.getElementById("widget-countdown");
   const widget = document.getElementById("widget-timer");
 
-  // 2. Definimos la lógica de actualización en una función interna
   const actualizar = () => {
     const ahora = Date.now();
     const restantes = Math.max(0, Math.floor((expiraEn - ahora) / 1000));
 
-    const min = Math.floor(restantes / 60)
-      .toString()
-      .padStart(2, "0");
+    const min = Math.floor(restantes / 60).toString().padStart(2, "0");
     const seg = (restantes % 60).toString().padStart(2, "0");
 
     if (display) {
       display.textContent = `${min}:${seg}`;
 
-      // Colores según el tiempo restante
+      // UX: color rojo cuando quedan menos de 60 segundos para urgencia visual
       if (restantes <= 60) {
         display.classList.replace("text-indigo-600", "text-red-600");
       } else {
@@ -280,29 +292,23 @@ function iniciarCuentaRegresiva(expiraEn) {
       }
     }
 
-    // Lógica cuando el tiempo llega a cero
     if (restantes <= 0) {
       clearInterval(intervaloTemporizador);
-
       sessionStorage.removeItem("reservaActiva");
 
       if (widget) widget.classList.add("hidden");
       document.body.classList.remove("overflow-hidden");
 
-      window.Auth.showToast(
-        "⏰ El tiempo expiró. Tu reserva fue liberada.",
-        "error",
-      );
+      window.Auth.showToast("⏰ El tiempo expiró. Tu reserva fue liberada.", "error");
 
-      const sId = sectorSeleccionado?.id || LocalStorage.getItem("SectorId");
+      // Fix: corregido bug de capitalización (LocalStorage → localStorage)
+      const sId = sectorSeleccionado?.id || localStorage.getItem("SectorId");
       if (sId) cargarAsientos(sId);
     }
   };
 
-  // 3. EJECUCIÓN INMEDIATA: Actualizamos antes de que pase el primer segundo
+  // Ejecutar inmediatamente antes del primer segundo
   actualizar();
-
-  // 4. Iniciamos el intervalo para los siguientes segundos
   intervaloTemporizador = setInterval(actualizar, 1000);
 }
 
@@ -319,21 +325,13 @@ function restaurarReservaActiva() {
     return;
   }
 
-  // --- EL ARREGLO ESTÁ AQUÍ ---
   const widget = document.getElementById("widget-timer");
+  document.getElementById("widget-asiento").textContent = reservaActiva.seatInfo;
 
-  // 1. Mostrar información del asiento
-  document.getElementById("widget-asiento").textContent =
-    reservaActiva.seatInfo;
-
-  // 2. Aplicar clases para centrar (Igual que en mostrarWidgetTimer)
   widget.classList.remove("hidden");
   widget.classList.add("flex");
-
-  // 3. Volver a bloquear el scroll del fondo
   document.body.classList.add("overflow-hidden");
 
-  // 4. Reiniciar el reloj
   iniciarCuentaRegresiva(reservaActiva.expiraEn);
 }
 
@@ -355,16 +353,13 @@ window.confirmarPago = async function () {
   spinner.classList.remove("hidden");
 
   try {
-    await API.request(
-      `reservations/${reservaActiva.reservationId}/confirm`,
-      "PUT",
-    );
+    await API.request(`reservations/${reservaActiva.reservationId}/confirm`, "PUT");
     clearInterval(intervaloTemporizador);
     sessionStorage.removeItem("reservaActiva");
     document.getElementById("widget-timer").classList.add("hidden");
+    document.body.classList.remove("overflow-hidden");
     mostrarToast("🎉 ¡Pago confirmado! Tu entrada fue comprada.", "success");
-    if (sectorSeleccionado)
-      await cargarAsientos(localStorage.getItem("SectorId"));
+    if (sectorSeleccionado) await cargarAsientos(localStorage.getItem("SectorId"));
   } catch {
     mostrarToast("❌ Error al confirmar el pago. Intentá de nuevo.", "error");
   } finally {
@@ -381,17 +376,15 @@ window.cancelarReservaActiva = async function () {
   const { reservationId } = JSON.parse(raw);
 
   try {
-    // Llamamos al endpoint que actualiza el estado
     await API.request(`reservations/${reservationId}/cancel`, "PUT");
-
-    // Si el servidor responde bien, limpiamos la UI
     clearInterval(intervaloTemporizador);
     sessionStorage.removeItem("reservaActiva");
     document.getElementById("widget-timer").classList.add("hidden");
+    document.body.classList.remove("overflow-hidden");
     mostrarToast("Reserva cancelada y asiento liberado.", "success");
     await cargarAsientos(localStorage.getItem("SectorId"));
-  } catch (error) {
-    mostrarToast("Error al cancelar la reserva.", "error");
+  } catch {
+    mostrarToast("❌ Error al cancelar la reserva.", "error");
   }
 };
 
